@@ -1,224 +1,111 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View,  TouchableOpacity, StyleSheet } from 'react-native';
 
-// Cell component
-function Cell(props) {
-  function handlePress() {
-    props.onPress();
+class LightsOutGame {
+  private board: number[][];
+  private moves: number;
+  private hasWon: boolean;
+
+  constructor(private boardSize: number, initialBoard?: number[][]) {
+    this.board = initialBoard || this.createRandomBoard();
+    this.moves = 0;
+    this.hasWon = false;
   }
 
-  return (
-    <TouchableOpacity
-      style={[styles.cell, props.isOn ? styles.cellOn : styles.cellOff]}
-      onPress={handlePress}
-    />
-  );
+  reset(initialBoard: number[][] | null = null) {
+    this.board = initialBoard || this.createRandomBoard();
+    this.moves = 0;
+    this.hasWon = false;
+  }
+
+  getBoard(): number[][] {
+    return this.board;
+  }
+
+  getMoves(): number {
+    return this.moves;
+  }
+
+  toggleCell(row: number, col: number) {
+    const toggle = (r: number, c: number) => {
+      if (r >= 0 && r < this.boardSize && c >= 0 && c < this.boardSize) {
+        this.board[r][c] = this.board[r][c] === 1 ? 0 : 1;
+      }
+    };
+
+    toggle(row, col); 
+    toggle(row - 1, col); 
+    toggle(row + 1, col); 
+    toggle(row, col - 1); 
+    toggle(row, col + 1); 
+
+    this.moves += 1;
+    this.checkWinCondition();
+  }
+
+  private checkWinCondition() {
+    this.hasWon = this.board.every(row => row.every(cell => cell === 0));
+  }
+
+  private createRandomBoard(): number[][] {
+    return Array.from({ length: this.boardSize }, () =>
+      Array.from({ length: this.boardSize }, () => Math.round(Math.random()))
+    );
+  }
 }
 
-// Board component
-function Board(props) {
-  function renderRow(row, rowIndex) {
-    return (
-      <View key={rowIndex} style={styles.row}>
-        {row.map((cell, colIndex) => renderCell(cell, rowIndex, colIndex))}
-      </View>
-    );
+function LightsOutController(props) {
+  const boardSize = props.boardSize || 5;
+  const initialBoard = props.initialBoard;
+
+  const [model] = useState(() => new LightsOutGame(boardSize, initialBoard));
+  const [, setRenderTrigger] = useState(0);
+
+  function forceUpdate() {
+    setRenderTrigger(prev => prev + 1);
   }
 
-  function renderCell(cell, rowIndex, colIndex) {
-    function handleCellPress() {
-      props.onToggle(rowIndex, colIndex);
-    }
-
-    return (
-      <Cell
-        key={`${rowIndex}-${colIndex}`}
-        isOn={cell}
-        onPress={handleCellPress}
-      />
-    );
+  function handleCellPress(row: number, col: number) {
+    model.toggleCell(row, col);
+    forceUpdate();
   }
 
   return (
     <View style={styles.board}>
-      {props.board.map(renderRow)}
-    </View>
-  );
-}
-
-function LightsOutGame(props) {
-  const boardSize = props.boardSize || 5;
-  function createInitialBoard() {
-    if (props.initialBoard) {
-      return props.initialBoard;
-    }
-    const newBoard = [];
-    for (let i = 0; i < boardSize; i++) {
-      const row = [];
-      for (let j = 0; j < boardSize; j++) {
-        row.push(Math.random() > 0.5);
-      }
-      newBoard.push(row);
-    }
-    return newBoard;
-  }
-  
-  const [board, setBoard] = useState(createInitialBoard);
-  const [moves, setMoves] = useState(0);
-  const [hasWon, setHasWon] = useState(false);
-  
-
-  useEffect(function checkWinCondition() {
-    let isWon = true;
-    
-  
-    for (let i = 0; i < board.length; i++) {
-      for (let j = 0; j < board[i].length; j++) {
-        if (board[i][j]) {
-          isWon = false;
-          break;
-        }
-      }
-      if (!isWon) {
-        break;
-      }
-    }
-    
-    setHasWon(isWon);
-  }, [board]);
-  
-
-  function toggleCell(board, row, col) {
-    if (row >= 0 && row < boardSize && col >= 0 && col < boardSize) {
-      board[row][col] = !board[row][col];
-    }
-    return board;
-  }
-  
-
-  function handleToggle(row, col) {
-    if (hasWon) {
-      return;
-    }
-    
-    setBoard(function updateBoard(prevBoard) {
-      // Create a deep copy of the board
-      const newBoard = prevBoard.map(row => [...row]);
-      
-      // Toggle the cell and its neighbors
-      toggleCell(newBoard, row, col);      // Center
-      toggleCell(newBoard, row-1, col);    // Up
-      toggleCell(newBoard, row+1, col);    // Down
-      toggleCell(newBoard, row, col-1);    // Left
-      toggleCell(newBoard, row, col+1);    // Right
-      
-      return newBoard;
-    });
-    
-    setMoves(function incrementMoves(prevMoves) {
-      return prevMoves + 1;
-    });
-  }
-  
-  function resetGame() {
-    setBoard(createInitialBoard());
-    setMoves(0);
-    setHasWon(false);
-  }
-  
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>LIGHTS OUT GAME</Text>
-      <Board board={board} onToggle={handleToggle} />
-      <Text style={styles.moves}>Moves: {moves}</Text>
-      
-      {hasWon && (
-        <Text style={styles.winText}>You won! Play again?</Text>
-      )}
-      
-      <TouchableOpacity style={styles.button} onPress={resetGame}>
-        <Text style={styles.buttonText}>Reset Game</Text>
-      </TouchableOpacity>
+      {model.getBoard().map((row, rowIndex) => (
+        <View key={rowIndex} style={styles.row}>
+          {row.map((cell, colIndex) => (
+            <TouchableOpacity
+              key={colIndex}
+              style={[
+                styles.cell,
+                { backgroundColor: cell === 1 ? 'black' : 'white' },
+              ]}
+              onPress={() => handleCellPress(rowIndex, colIndex)}
+            />
+          ))}
+        </View>
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  board: {
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  board: {
-    width: 250,
-    height: 250,
   },
   row: {
-    flex: 1,
     flexDirection: 'row',
   },
   cell: {
-    flex: 1,
-    margin: 3,
+    width: 50,
+    height: 50,
+    margin: 2,
     borderWidth: 1,
-    borderColor: '#888',
-  },
-  cellOn: {
-    backgroundColor: 'yellow',
-  },
-  cellOff: {
-    backgroundColor: 'black',
-  },
-  moves: {
-    fontSize: 18,
-    marginTop: 15,
-  },
-  winText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'green',
-    marginTop: 10,
-  },
-  button: {
-    backgroundColor: 'blue',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 15,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
+    borderColor: 'gray',
   },
 });
 
-export default LightsOutGame;
-
-// Mockup 
-
-// --------------------------------
-// |                              |
-// |      [ ][ ][X][ ][ ]         |
-// |      [ ][X][X][X][ ]         |
-// |      [X][X][ ][X][X]         |
-// |      [ ][X][X][X][ ]         |
-// |      [ ][ ][X][ ][ ]         |
-// |                              |
-// |                              |
-// --------------------------------
-// Mockup JSON 
-// {
-//   "boardSize": 5,
-//   "initialBoard": [
-//     [false, false, true, false, false],
-//     [false, true, true, true, false],
-//     [true, true, false, true, true],
-//     [false, true, true, true, false],
-//     [false, false, true, false, false]
-//   ]
-// }
+export default LightsOutController;
